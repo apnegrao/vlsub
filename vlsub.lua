@@ -33,6 +33,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
 -- ...
 
 local options = {
+  multi = {
+	["por"] = true, 
+	["pob"] = true, 
+	["eng"] = true
+  },
   language = nil,
   downloadBehaviour = 'save',
   langExt = false,
@@ -1673,14 +1678,20 @@ function display_subtitles()
     setMessage("<b>"..lang["mess_complete"]..":</b> "..
       lang["mess_no_res"])
   elseif openSub.itemStore then 
+    local sel = input_table["language"]:get_value()
+    local results = 0
     for i, item in ipairs(openSub.itemStore) do
-      mainlist:add_value(
-      (item.SubFileName or "???")..
-      " ["..(item.SubLanguageID or "?").."]"..
-      " ("..(item.SubSumCD or "?").." CD)", i)
+      if (sel == 0 and openSub.option.multi[item.SubLanguageID]) or sel > 0 then
+        -- If language is "All", filter by multi. Otherwise, show everything.
+        results = results + 1
+        mainlist:add_value(
+          (item.SubFileName or "???")..
+          " ["..(item.SubLanguageID or "?").."]"..
+           " ("..(item.SubSumCD or "?").." CD)", i)
+      end
     end
     setMessage("<b>"..lang["mess_complete"]..":</b> "..
-      #(openSub.itemStore).."  "..lang["mess_res"])
+      results.."  "..lang["mess_res"])
   end
 end
 
