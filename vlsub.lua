@@ -64,6 +64,7 @@ local options = {
   },
   translation = {
     int_all = 'All',
+    int_multi = 'Multi',
     int_descr = 'Download subtitles from OpenSubtitles.org',
     int_research = 'Research',
     int_config = 'Config',
@@ -427,7 +428,7 @@ function interface_main()
     'language',
     openSub.conf.languages, 
     2, 
-    lang["int_all"])
+    {lang["int_all"], lang["int_multi"]})
     
   display_subtitles()
 end
@@ -524,8 +525,8 @@ function interface_config()
     'default_language',
     'language',
     openSub.conf.languages,
-    2,
-    lang["int_all"])
+    2,                  --We need to pass "all" this way to be able to check the
+    {lang["int_all"]})  --size of the 'default' var later in 'display_select'
   assoc_select_conf(
     'downloadBehaviour',
     'downloadBehaviour',
@@ -609,6 +610,7 @@ function assoc_select_conf(select_id, option, conf, ind, default)
     dflt = default,
     ind = ind
   }
+
   set_default_option(select_id)
   display_select(select_id)
 end
@@ -638,20 +640,29 @@ function display_select(select_id)
   local option = openSub.option[opt]
   local default = select_conf[select_id].dflt
   local default_isset = false
+  local default_num = 0
     
   if not default then 
     default_isset = true
+  else
+    default_num = (#default)
   end
-  
+
   for k, l in ipairs(conf) do
     if default_isset then
       input_table[select_id]:add_value(l[2], k)
     else
       if option then
-        input_table[select_id]:add_value(l[2], k)
-        input_table[select_id]:add_value(default, 0)
+        input_table[select_id]:add_value(l[2],k)
+        input_table[select_id]:add_value(default[1], 0)
+        if default_num > 1 then --FIXME: Make it general (for more than 2 dflts)
+          input_table[select_id]:add_value(default[2], -1)
+        end
       else
-        input_table[select_id]:add_value(default, 0)
+        input_table[select_id]:add_value(default[1], 0)
+        if default_num > 1 then
+          input_table[select_id]:add_value(default[2], -1)
+        end
         input_table[select_id]:add_value(l[2], k)
       end
       default_isset = true
@@ -1633,7 +1644,7 @@ openSub = {
 
 function searchHash()
   local sel = input_table["language"]:get_value()
-  if sel == 0 then
+  if sel <= 0 then
     openSub.movie.sublanguageid = 'all'
   else
     openSub.movie.sublanguageid = openSub.conf.languages[sel][1]
@@ -1656,7 +1667,7 @@ function searchIMBD()
     input_table["episodeNumber"]:get_text())
 
   local sel = input_table["language"]:get_value()
-  if sel == 0 then
+  if sel <= 0 then
     openSub.movie.sublanguageid = 'all'
   else
     openSub.movie.sublanguageid = openSub.conf.languages[sel][1]
@@ -1672,7 +1683,7 @@ end
 function display_subtitles()
   local mainlist = input_table["mainlist"]
   mainlist:clear()
-  
+
   if openSub.itemStore == "0" then 
     mainlist:add_value(lang["mess_no_res"], 1)
     setMessage("<b>"..lang["mess_complete"]..":</b> "..
@@ -1681,7 +1692,7 @@ function display_subtitles()
     local sel = input_table["language"]:get_value()
     local results = 0
     for i, item in ipairs(openSub.itemStore) do
-      if (sel == 0 and openSub.option.multi[item.SubLanguageID]) or sel > 0 then
+      if (sel < 0 and openSub.option.multi[item.SubLanguageID]) or sel >= 0 then
         -- If language is "All", filter by multi. Otherwise, show everything.
         results = results + 1
         mainlist:add_value(
