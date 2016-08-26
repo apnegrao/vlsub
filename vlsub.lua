@@ -1684,21 +1684,29 @@ function display_subtitles()
   local mainlist = input_table["mainlist"]
   mainlist:clear()
 
-  if openSub.itemStore == "0" then 
+  if openSub.itemStore == "0" then
     mainlist:add_value(lang["mess_no_res"], 1)
     setMessage("<b>"..lang["mess_complete"]..":</b> "..
       lang["mess_no_res"])
   elseif openSub.itemStore then 
     local sel = input_table["language"]:get_value()
     local results = 0
-    for i, item in ipairs(openSub.itemStore) do
+    local i = 1
+    while i <= #(openSub.itemStore) do
+      item = openSub.itemStore[i]
       if (sel < 0 and openSub.option.multi[item.SubLanguageID]) or sel >= 0 then
-        -- If language is "All", filter by multi. Otherwise, show everything.
+        -- '-1' is for 'Multi'. Otherwise, show everything.
         results = results + 1
         mainlist:add_value(
           (item.SubFileName or "???")..
           " ["..(item.SubLanguageID or "?").."]"..
            " ("..(item.SubSumCD or "?").." CD)", i)
+        i = i + 1
+      else  -- sel < 0 and lang not in 'multi':
+            -- We need to remove the item from the itemStore so that when the
+            -- results are redrawn (e.g., when returning from the config dialog)
+            -- only those that refer to languages in 'multi' are shown.
+        table.remove(openSub.itemStore, i)
       end
     end
     setMessage("<b>"..lang["mess_complete"]..":</b> "..
