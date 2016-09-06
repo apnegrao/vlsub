@@ -33,11 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
 -- ...
 
 local options = {
-  multi = {
-	["por"] = true, 
-	["pob"] = true, 
-	["eng"] = true
-  },
+  multi = nil,
   language = nil,
   downloadBehaviour = 'save',
   langExt = false,
@@ -68,6 +64,8 @@ local options = {
     int_descr = 'Download subtitles from OpenSubtitles.org',
     int_research = 'Research',
     int_config = 'Config',
+    int_config_multi = 'Choose languages',
+    int_config_multi_button = 'Config Multi',
     int_configuration = 'Configuration',
     int_help = 'Help',
     int_search_hash = 'Search by hash',
@@ -86,6 +84,7 @@ local options = {
     int_bool_false = 'No',
     int_search_transl = 'Search translations',
     int_searching_transl = 'Searching translations ...',
+    int_language = 'Language',
     int_int_lang = 'Interface language',
     int_default_lang = 'Subtitles language',
     int_dowload_behav = 'What to do with subtitles',
@@ -457,7 +456,9 @@ function interface_config()
   input_table['intLang'] = dlg:add_dropdown(3, 1, 1, 1)	
   dlg:add_label(
     lang["int_default_lang"]..':', 1, 2, 2, 1)
-  input_table['default_language'] = dlg:add_dropdown(3, 2, 1, 1)	
+  input_table['intMultiButton'] = dlg:add_button(
+    lang["int_config_multi_button"], show_conf_multi, 2, 2, 1, 1)
+  input_table['default_language'] = dlg:add_dropdown(3, 2, 1, 1)
   dlg:add_label(
     lang["int_dowload_behav"]..':', 1, 3, 2, 1)
   input_table['downloadBehaviour'] = dlg:add_dropdown(3, 3, 1, 1)
@@ -554,6 +555,89 @@ function interface_no_support()
     string.rep ("&nbsp;", 100), 1, 2, 3, 1)
 end
 
+--- Shows the interface for choosing the languages used by 'multi'.
+-- This interface shows three dropdown lists from which the user can
+-- choose the languages to use when searching with the 'multi' option.
+-- It is not mandatory to choose all three languages, just select the
+-- option "------" from one of the dropdown lists.
+-- TODO: Allow for more than three langs to be chosen
+function interface_conf_multi()
+  local i = 1
+  
+  -- Sort the languages table so that we have the same list (except for the
+  -- first item) and indexes in all dropdown menus that will be created.
+  table.sort(openSub.conf.languages, 
+    function(a, b) 
+      return a[2] < b[2]
+    end
+  )
+
+  -- First show the dropdown menu with the selected languages at the top.
+  for lang_code, bool in pairs(openSub.option.multi) do
+    add_multi_item(i, lang_code, openSub.conf.languages, false)
+    i = i + 1
+  end
+
+  -- Fill the rest of the interface (if necessary) with dropdown menus with 
+  -- "------" at the top so we have three slots.
+  while (i <= 3) do
+    add_multi_item(i, lang_code, openSub.conf.languages, true)
+    i = i + 1
+  end
+
+  -- FIXME: Should I do this the same way as VLSub? I'm not sure why
+  -- they do it that way.
+  --input_table['message'] = nil
+  --input_table['message'] = dlg:add_label(' ', 1, i + 1, 4, 1)
+
+  dlg:add_label(' ', 1, i + 1, 4, 1)
+
+  dlg:add_button(lang["int_cancel"], show_conf, 2, i + 2, 1, 1)
+  dlg:add_button(lang["int_save"], apply_config_multi, 3, i + 2, 1, 1)
+end
+
+--- Adds one language selection line to the config multi interface.
+-- Each line follows the pattern "Language <i>: <dropdown list>"
+-- @param i The number of the row where the line will be added.
+-- @param lang_code The code of the currently selected lang (e.g., "eng").
+-- @param lang_table The list of languages, sorted alphabetically.
+-- @param fill_only A boolean value that, when set, puts the ingore option
+-- at the top of the dropdown list. Used to fill the interface when less
+-- than three languages are selected.
+function add_multi_item(i, lang_code, lang_table, fill_only)
+  dlg:add_label(
+    lang["int_language"].." "..i..":", 1, i, 1, 1)
+
+   input_table['multi_lang'..i] = dlg:add_dropdown(3, i, 1, 1)
+  local default_lang = {}
+  local fill_index = 0
+  if (not fill_only) then
+    fill_index = -1
+    -- Find the index of 'lang_code' so we can put it at the start of the list
+    -- FIXME: Surely this can be done more efficiently...
+    for index, lang_pair in ipairs(lang_table) do
+      if(lang_pair[1] == lang_code) then
+        table.insert(default_lang, lang_pair[2])
+        table.insert(default_lang, index)
+      end
+    end
+  end
+
+  -- Add the values to the dropdown list, using the original language indexes.
+  if(not fill_only) then
+    input_table['multi_lang'..i]:add_value(default_lang[1], default_lang[2])
+  end
+
+  input_table['multi_lang'..i]:add_value("--------", fill_index)
+
+  for index, lang_pair in ipairs(lang_table) do
+    if(fill_only or (lang_pair[1] ~= lang_code)) then
+      input_table['multi_lang'..i]:add_value(lang_pair[2], index)
+    end
+  end 
+
+end
+
 function trigger_menu(dlg_id)
   if dlg_id == 1 then
     close_dlg()
@@ -570,6 +654,11 @@ function trigger_menu(dlg_id)
     dlg = vlc.dialog(
       openSub.conf.useragent..': '..lang["int_help"])
     interface_help()
+  elseif dlg_id == 4 then
+    close_dlg()
+    dlg = vlc.dialog(
+      openSub.conf.useragent..': '..lang["int_config_multi"])
+    interface_conf_multi()
   end
   collectgarbage() --~ !important	
 end 
@@ -584,6 +673,10 @@ end
 
 function show_help()
   trigger_menu(3)
+end
+
+function show_conf_multi()
+  trigger_menu(4)
 end
 
 function close_dlg()
@@ -936,6 +1029,26 @@ function getenv_lang()
      end
     end 
   end
+end
+
+---Saves (to memory) the languages selected for searching with 'multi'
+-- To save to disk the user has to select "Save" in the "Configuration" dialog.
+function apply_config_multi()
+  local i = 1
+
+  openSub.option.multi = {}
+
+  while (input_table['multi_lang'..i]) do
+    lang_index = input_table['multi_lang'..i]:get_value()
+    if(lang_index > 0) then
+        lang_code = languages[lang_index][1]
+        vlc.msg.dbg("[VLSub] Saving multi: "..lang_code)
+        openSub.option.multi[lang_code] = true
+    end
+    i = i + 1
+  end
+  
+  show_conf()
 end
 
 function apply_config()
