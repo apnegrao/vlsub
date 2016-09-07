@@ -34,6 +34,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston MA 02110-1301, USA.
 
 local options = {
   multi = nil,
+  multi_is_default = false,
   language = nil,
   downloadBehaviour = 'save',
   langExt = false,
@@ -421,13 +422,17 @@ function interface_main()
     lang["int_dowload_sel"], download_subtitles, 3, 7, 1, 1)
   dlg:add_button(
     lang["int_close"], close, 4, 7, 1, 1) 
-  
+
+  -- If 'Multi' is the default option, show it before 'All'
+  local default =  openSub.option.multi_is_default and 
+    {lang["int_multi"], lang["int_all"]} or 
+    {lang["int_all"], lang["int_multi"]}
   assoc_select_conf(
     'language',
     'language',
     openSub.conf.languages, 
     2, 
-    {lang["int_all"], lang["int_multi"]})
+    default)
     
   display_subtitles()
 end
@@ -522,12 +527,17 @@ function interface_config()
     'intLang',
     openSub.conf.translations_avail,
     2)
+
+  -- If 'Multi' is the default option, show it before 'All'
+  local default =  openSub.option.multi_is_default and 
+    {lang["int_multi"], lang["int_all"]} or 
+    {lang["int_all"], lang["int_multi"]}
   assoc_select_conf(
     'default_language',
     'language',
     openSub.conf.languages,
-    2,                  --We need to pass "all" this way to be able to check the
-    {lang["int_all"]})  --size of the 'default' var later in 'display_select'
+    2,
+    default)
   assoc_select_conf(
     'downloadBehaviour',
     'downloadBehaviour',
@@ -1075,9 +1085,16 @@ function apply_config()
       sel_cf = select_conf[select_id]
       opt = sel_cf.opt
       
-      if sel_val == 0 then
+      if sel_val <= 0 then
         openSub.option[opt] = nil
+        if (select_id == 'default_language') and (sel_val == -1) then
+          openSub.option.multi_is_default = 
+            not openSub.option.multi_is_default
+        end
       else
+        if select_id == 'default_language' then
+          openSub.option.multi_is_default = false
+        end
         openSub.option[opt] = sel_cf.cf[sel_val][1]
       end
       
@@ -1805,18 +1822,22 @@ function display_subtitles()
     local sel = input_table["language"]:get_value()
     local results = 0
     local i = 1
+    local multi_is_set = 
+        (openSub.option.multi_is_default and sel == 0) or
+        (not (openSub.option.multi_is_default) and sel == -1)
+
     while i <= #(openSub.itemStore) do
       item = openSub.itemStore[i]
-      if (sel < 0 and openSub.option.multi[item.SubLanguageID]) or sel >= 0 then
-        -- '-1' is for 'Multi'. Otherwise, show everything.
+      if (multi_is_set and openSub.option.multi[item.SubLanguageID]) 
+            or (not multi_is_set) then
         results = results + 1
         mainlist:add_value(
           (item.SubFileName or "???")..
           " ["..(item.SubLanguageID or "?").."]"..
            " ("..(item.SubSumCD or "?").." CD)", i)
         i = i + 1
-      else  -- sel < 0 and lang not in 'multi':
-            -- We need to remove the item from the itemStore so that when the
+      else  -- If multi_is_set, but item.SubLanguageID is not in 'multi' we
+            -- need to remove the item from the itemStore so that when the
             -- results are redrawn (e.g., when returning from the config dialog)
             -- only those that refer to languages in 'multi' are shown.
         table.remove(openSub.itemStore, i)
